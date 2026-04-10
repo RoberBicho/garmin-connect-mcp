@@ -24,11 +24,18 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Cache Garmin tokens
+      - name: Restore Garmin OAuth1 token
+        run: |
+          mkdir -p ~/.garmin-mcp
+          echo '${{ secrets.GARMIN_OAUTH1_TOKEN }}' > ~/.garmin-mcp/oauth1_token.json
+          chmod 600 ~/.garmin-mcp/oauth1_token.json
+
+      - name: Cache Garmin OAuth2 token
         uses: actions/cache@v4
         with:
-          path: ~/.garmin-mcp
-          key: garmin-tokens-${{ secrets.GARMIN_EMAIL }}
+          path: ~/.garmin-mcp/oauth2_token.json
+          key: garmin-oauth2-${{ github.run_id }}
+          restore-keys: garmin-oauth2-
 
       - name: Install dependencies
         run: npm ci
