@@ -75,10 +75,10 @@ async function syncHealth(client: GarminClient, date: string): Promise<void> {
     date,
     data: {
       vo2max: vo2Value,
-      hrv_night_avg: hrvSummary?.lastNight ?? null,
+      hrv_night_avg: hrvSummary?.lastNightAvg ?? null,
       hrv_weekly_avg: hrvSummary?.weeklyAvg ?? null,
       hrv_status: hrvSummary?.status ?? null,
-      sleep_score: (sleepDto?.sleepScores as Record<string, unknown> | null)?.totalDuration ?? (sleep?.overallSleepScore ?? null),
+      sleep_score: (sleepDto?.sleepScores as Record<string, Record<string, unknown>> | null)?.overall?.value ?? null,
       sleep_start: formatTime(sleepStartTs),
       sleep_end: formatTime(sleepEndTs),
       sleep_duration_min: secondsToMinutes(
