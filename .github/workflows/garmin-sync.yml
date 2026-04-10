@@ -2,8 +2,9 @@ name: Garmin Daily Sync
 
 on:
   schedule:
-    - cron: '0 11 * * *'   # 12:00 hora española (UTC+1 invierno) / 13:00 en verano (UTC+2)
-    - cron: '45 22 * * *'  # 23:45 hora española (UTC+1 invierno) / 00:45 en verano (UTC+2)
+    - cron: '0 9 * * *'    # 10:00 hora española (UTC+1 invierno)
+    - cron: '0 14 * * *'   # 15:00 hora española (UTC+1 invierno)
+    - cron: '0 22 * * *'   # 23:00 hora española (UTC+1 invierno)
   workflow_dispatch:
     inputs:
       date:
