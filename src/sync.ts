@@ -45,11 +45,9 @@ async function postToMake(payload: unknown): Promise<void> {
 async function syncHealth(client: GarminClient, date: string): Promise<void> {
   console.error(`Syncing health data for ${date}...`);
 
-  const [hrvRaw, sleepRaw, vo2Raw] = await Promise.all([
-    client.getHRV(date).catch(() => null),
-    client.getSleepData(date).catch(() => null),
-    client.getVO2Max(date).catch(() => null),
-  ]);
+  const hrvRaw = await client.getHRV(date).catch(() => null);
+  const sleepRaw = await client.getSleepData(date).catch(() => null);
+  const vo2Raw = await client.getVO2Max(date).catch(() => null);
 
   const hrv = hrvRaw as Record<string, unknown> | null;
   const sleep = sleepRaw as Record<string, unknown> | null;

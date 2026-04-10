@@ -24,6 +24,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Cache Garmin tokens
+        uses: actions/cache@v4
+        with:
+          path: ~/.garmin-mcp
+          key: garmin-tokens-${{ secrets.GARMIN_EMAIL }}
+
       - name: Install dependencies
         run: npm ci
 
