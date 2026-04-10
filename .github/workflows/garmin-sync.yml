@@ -1,0 +1,39 @@
+name: Garmin Daily Sync
+
+on:
+  schedule:
+    - cron: '45 22 * * *'  # 23:45 hora española (UTC+1 invierno) / ajusta a '45 21 * * *' en verano (UTC+2)
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Fecha a sincronizar (YYYY-MM-DD). Vacío = ayer.'
+        required: false
+        default: ''
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run sync
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+          SYNC_DATE: ${{ github.event.inputs.date }}
+        run: node build/sync.js
