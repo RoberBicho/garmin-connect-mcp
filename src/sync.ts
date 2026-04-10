@@ -14,10 +14,8 @@ if (!MAKE_WEBHOOK_URL) {
   process.exit(1);
 }
 
-function yesterdayString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().split('T')[0]!;
+function todayString(): string {
+  return new Date().toISOString().split('T')[0]!;
 }
 
 function secondsToMinutes(seconds: number | null | undefined): number | null {
@@ -139,7 +137,7 @@ async function syncActivities(client: GarminClient, date: string): Promise<void>
 }
 
 async function main(): Promise<void> {
-  const date = process.env.SYNC_DATE ?? yesterdayString();
+  const date = process.env.SYNC_DATE ?? todayString();
   const client = new GarminClient(GARMIN_EMAIL!, GARMIN_PASSWORD!);
 
   console.error(`Starting Garmin sync for date: ${date}`);
