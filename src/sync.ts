@@ -18,11 +18,6 @@ function todayString(): string {
   return new Date().toISOString().split('T')[0]!;
 }
 
-function secondsToMinutes(seconds: number | null | undefined): number | null {
-  if (seconds == null) return null;
-  return Math.round(seconds / 60);
-}
-
 function formatTime(timestampLocal: number | null | undefined): string | null {
   if (timestampLocal == null) return null;
   const d = new Date(timestampLocal);
@@ -43,53 +38,41 @@ async function postToMake(payload: unknown): Promise<void> {
 async function syncHealth(client: GarminClient, date: string): Promise<void> {
   console.error(`Syncing health data for ${date}...`);
 
-  const hrvRaw = await client.getHRV(date).catch(() => null);
-  const sleepRaw = await client.getSleepData(date).catch(() => null);
-  const vo2Raw = await client.getVO2Max(date).catch(() => null);
+  const [hrvRaw, sleepRaw, vo2Raw] = await Promise.all([
+    client.getHRV(date).catch(() => null),
+    client.getSleepData(date).catch(() => null),
+    client.getVO2Max(date).catch(() => null),
+  ]);
 
   const hrv = hrvRaw as Record<string, unknown> | null;
   const sleep = sleepRaw as Record<string, unknown> | null;
-  const vo2 = vo2Raw as Record<string, unknown> | null;
+  const vo2 = vo2Raw as Array<Record<string, unknown>> | null;
 
   const hrvSummary = hrv?.hrvSummary as Record<string, unknown> | null ?? null;
   const sleepDto = sleep?.dailySleepDTO as Record<string, unknown> | null ?? null;
-  const napDto = sleep?.napDTO as Record<string, unknown> | null ?? null;
+  const sleepScores = sleepDto?.sleepScores as Record<string, Record<string, unknown>> | null ?? null;
 
   const vo2Value = (() => {
-    if (!vo2) return null;
-    const generic = vo2.vo2MaxPreciseValue ?? vo2.vo2MaxValue;
-    return generic ?? null;
+    if (!Array.isArray(vo2) || vo2.length === 0) return null;
+    const generic = vo2[0]?.generic as Record<string, unknown> | null ?? null;
+    return generic?.vo2MaxPreciseValue ?? generic?.vo2MaxValue ?? null;
   })();
-
-  const sleepStartTs = sleepDto?.sleepStartTimestampLocal as number | null ?? null;
-  const sleepEndTs = sleepDto?.sleepEndTimestampLocal as number | null ?? null;
-  const napStartTs = napDto?.startGMT as string | null ?? null;
-  const napDuration = napDto
-    ? secondsToMinutes((napDto.durationInSeconds as number | null) ?? null)
-    : 0;
 
   const payload = {
     type: 'health',
     date,
-    data: {
-      vo2max: vo2Value,
-      hrv_night_avg: hrvSummary?.lastNightAvg ?? null,
-      hrv_weekly_avg: hrvSummary?.weeklyAvg ?? null,
-      hrv_status: hrvSummary?.status ?? null,
-      sleep_score: (sleepDto?.sleepScores as Record<string, Record<string, unknown>> | null)?.overall?.value ?? null,
-      sleep_start: formatTime(sleepStartTs),
-      sleep_end: formatTime(sleepEndTs),
-      sleep_duration_min: secondsToMinutes(
-        ((sleepDto?.deepSleepSeconds as number | null) ?? 0) +
-        ((sleepDto?.lightSleepSeconds as number | null) ?? 0) +
-        ((sleepDto?.remSleepSeconds as number | null) ?? 0),
-      ),
-      deep_sleep_min: secondsToMinutes(sleepDto?.deepSleepSeconds as number | null ?? null),
-      light_sleep_min: secondsToMinutes(sleepDto?.lightSleepSeconds as number | null ?? null),
-      rem_min: secondsToMinutes(sleepDto?.remSleepSeconds as number | null ?? null),
-      nap_start: napStartTs,
-      nap_min: napDuration,
-    },
+    vo2max: vo2Value,
+    hrvLastNightAvg: hrvSummary?.lastNightAvg ?? null,
+    hrvWeeklyAvg: hrvSummary?.weeklyAvg ?? null,
+    hrvStatus: hrvSummary?.status ?? null,
+    sleepScore: sleepScores?.overall?.value ?? null,
+    sleepStart: formatTime(sleepDto?.sleepStartTimestampLocal as number | null ?? null),
+    sleepEnd: formatTime(sleepDto?.sleepEndTimestampLocal as number | null ?? null),
+    sleepDurationSeconds: sleepDto?.sleepTimeSeconds ?? null,
+    deepSleepSeconds: sleepDto?.deepSleepSeconds ?? null,
+    lightSleepSeconds: sleepDto?.lightSleepSeconds ?? null,
+    remSleepSeconds: sleepDto?.remSleepSeconds ?? null,
+    napSeconds: sleepDto?.napTimeSeconds ?? null,
   };
 
   await postToMake(payload);
@@ -108,31 +91,36 @@ async function syncActivities(client: GarminClient, date: string): Promise<void>
   }
 
   for (const activity of activities) {
+    const activityId = activity.activityId as number;
+    const zonesRaw = await client.getActivityHrZones(activityId).catch(() => null);
+    const zones = zonesRaw as Array<Record<string, unknown>> | null;
+
+    const zoneSeconds = (zoneNum: number): number | null => {
+      if (!Array.isArray(zones)) return null;
+      const z = zones.find((z) => z.zoneNumber === zoneNum);
+      return z?.secsInZone != null ? (z.secsInZone as number) : null;
+    };
+
     const payload = {
       type: 'activity',
-      date,
-      data: {
-        activityId: activity.activityId,
-        activityType: (activity.activityType as Record<string, unknown> | null)?.typeKey ?? null,
-        activityName: activity.activityName,
-        startTimeLocal: activity.startTimeLocal,
-        duration_min: activity.duration != null ? Math.round((activity.duration as number) / 60) : null,
-        kcal: activity.calories,
-        averageHR: activity.averageHR,
-        maxHR: activity.maxHR,
-        aerobicTrainingEffect: activity.aerobicTrainingEffect,
-        anaerobicTrainingEffect: activity.anaerobicTrainingEffect,
-        hrTimeInZone_1: activity.hrTimeInZone_1,
-        hrTimeInZone_2: activity.hrTimeInZone_2,
-        hrTimeInZone_3: activity.hrTimeInZone_3,
-        hrTimeInZone_4: activity.hrTimeInZone_4,
-        hrTimeInZone_5: activity.hrTimeInZone_5,
-        waterEstimated: activity.waterEstimated,
-      },
+      activityType: (activity.activityType as Record<string, unknown> | null)?.typeKey ?? null,
+      startTimeLocal: activity.startTimeLocal,
+      duration: activity.duration ?? null,
+      kcal: activity.calories ?? null,
+      averageHR: activity.averageHR ?? null,
+      maxHR: activity.maxHR ?? null,
+      aerobicTrainingEffect: activity.aerobicTrainingEffect ?? null,
+      anaerobicTrainingEffect: activity.anaerobicTrainingEffect ?? null,
+      hrTimeInZone_1: zoneSeconds(1),
+      hrTimeInZone_2: zoneSeconds(2),
+      hrTimeInZone_3: zoneSeconds(3),
+      hrTimeInZone_4: zoneSeconds(4),
+      hrTimeInZone_5: zoneSeconds(5),
+      waterEstimated: activity.waterEstimated ?? null,
     };
 
     await postToMake(payload);
-    console.error(`Activity ${activity.activityId} sent.`);
+    console.error(`Activity ${activityId} sent.`);
   }
 }
 
