@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: 'Fecha a sincronizar (YYYY-MM-DD). Vacío = ayer.'
+        description: 'Fecha a sincronizar (YYYY-MM-DD). Vacío = hoy.'
         required: false
         default: ''
 

@@ -125,7 +125,7 @@ async function syncActivities(client: GarminClient, date: string): Promise<void>
 }
 
 async function main(): Promise<void> {
-  const date = process.env.SYNC_DATE ?? todayString();
+  const date = process.env.SYNC_DATE || todayString();
   const client = new GarminClient(GARMIN_EMAIL!, GARMIN_PASSWORD!);
 
   console.error(`Starting Garmin sync for date: ${date}`);
